@@ -92,7 +92,7 @@ def class_assign(todo,dfcot_class,dfbez):
     dfcot_class = dfcot_class.sort_values(by=['NrUpgrade'],ascending=True)
     dfcot_class=dfcot_class.sort_values(by=['Max # Pers'],ascending= True)
 #    todo=todo[0:10]
-    for j in tqdm(todo.index):
+    for j in (todo.index):
         k=0
         match = False
         res_id = todo.loc[j,"ID"] 

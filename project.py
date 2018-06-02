@@ -177,6 +177,7 @@ def writer():
     name = name + ".xlsx"
     
     writer = pd.ExcelWriter(name)
-    dfres.to_excel(writer,'Sheet1')
-    dfbez.to_excel(writer,'Sheet2')
+    dfres.to_excel(writer,'Reservations')
+    dfbez.to_excel(writer,'Bezetting')
+    dfcot.to_excel(writer,'Cottages')
     writer.save()

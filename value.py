@@ -10,7 +10,7 @@ import pandas as pd
 import numpy as np
 import datetime
 from tqdm import tqdm
-#import regex as re
+import regex as re
 
 #import multiprocessing
 
@@ -20,6 +20,26 @@ def assign(res_id, cot_id):
     duration = dfres.get_value(index = res_id-1,col ='Length of Stay')
     dfbez.loc[cot_id -1][col:col+duration] += res_id
     dfres.loc[res_id - 1,'Assigned']=cot_id
+
+def swap(res_id1,cot_id1,res_id2,cot_id2):
+    datum = dfres.get_value(index = res_id1-1,col = 'Arrival Date')
+    col = dfbez.columns.get_loc(datum)
+    duration = dfres.get_value(index = res_id1-1,col ='Length of Stay')
+    dfbez.loc[cot_id1-1][col:col+duration] = res_id2
+    dfbez.loc[cot_id2-1][col:col+duration] = res_id1
+    
+def is_val_swap(res_id, cot_id):#kijkt of een combinatie reservering/huis geldig is
+    options = ['Face South', 'Near Playground', 'Close to the Centre', 'Near Lake ',
+       'Near car park', 'Accessible for Wheelchair', 'Child Friendly',
+       'Dish Washer ', 'Wi-Fi Coverage ', 'Covered Terrace']
+    if dfres.get_value(index=res_id-1,col='# Persons') > dfcot.get_value(index=cot_id-1,col='Max # Pers'):
+        return(False) #Huis is te klein
+    for opt in options:
+        if (dfres.get_value(index=res_id - 1,col =opt) == 1) and (dfcot.get_value(index=cot_id - 1,col =opt) == 0):
+            return (False) #Voor alle extra opties, kijk of deze gevraagd en aanwezig zijn
+    if dfres.get_value(index=res_id - 1,col='Class') > dfcot.get_value(index=cot_id - 1,col='Class'):
+        return(False) # Minimaal de juiste klasse?
+    return(True) #Voldoet aan alle eisen         
     
 def initialize():
     print("Initialize")
@@ -28,7 +48,7 @@ def initialize():
     global dfbez
     global test
 #    file = 'startoplossing.xlsx
-    file = 'startoplossingbb.xlsx'
+    file = 'startoplossing.xlsx'
     
     xl = pd.ExcelFile(file) 
     
@@ -48,20 +68,18 @@ def initialize():
 if not 'dfres' in globals():
     initialize()
     
+def score(cot_id):        
+    gaps = 0
+    legionella = 0
+    weekendgaps = 0
+    upgrades = 0
+    possible_cap = np.array([2, 4, 5, 6, 8, 12])#mogelijke huizen, uit de handleiding
     
-gaps = 0
-legionella = 0
-weekendgaps = 0
-upgrades = 0
-possible_cap = np.array([2, 4, 5, 6, 8, 12])#mogelijke huizen, uit de handleiding
-
-temp= dfbez
-#temp= dfbez[208:209]
-for i in (temp.index):
-    test=dfbez.loc[i]
+    temp= dfbez.loc[cot_id]
+    #temp= dfbez[208:209]
     line = '0'
-    for j in test.index:
-        if test.loc[j] != 0:
+    for j in temp.index:
+        if temp.loc[j] != 0:
             line=line+ str(0)
             #line = line + str(test.loc[j])
         else:
@@ -77,33 +95,28 @@ for i in (temp.index):
     for j in g:
         if len(j) > 23:
             legionella+=1
-
-test=dfres[dfres['Cottage (Fixed)']==0]
-#test=test[0:10]
-for k in test.index:
-#        res_in_review = dfres.loc[i]
-    assigned = dfres.get_value(index = k,col = 'Assigned')- 1 #corrigeren voor 
-#        cot_in_review = dfcot.loc[assigned]
-    if dfcot.get_value(index = assigned,col = "Class") > dfres.get_value(index = k,col = 'Class'): 
-        upgrades += 1
-#        print('Class',dfcot.get_value(index = assigned,col = "Class"),dfres.get_value(index = k,col = 'Class'),k)
-    else:
-        eff_nr_pers = min(possible_cap[possible_cap >= dfres.get_value(index= k,col = "# Persons")])
-        if eff_nr_pers < dfcot.get_value(index = assigned,col = "Max # Pers"): 
+    temp_res = dfres[dfres['ID'].isin(pd.unique(temp))]
+    
+    temp_res=temp_res[temp_res['Cottage (Fixed)']==0]
+    #test=test[0:10]
+    for k in temp_res.index:
+    #        res_in_review = dfres.loc[i]
+        assigned = temp_res.get_value(index = k,col = 'Assigned')- 1 #corrigeren voor 
+    #        cot_in_review = dfcot.loc[assigned]
+        if dfcot.get_value(index = assigned,col = "Class") > temp_res.get_value(index=k,col = 'Class'): 
             upgrades += 1
-#            print('Cap',dfres.get_value(index= k,col = "# Persons") , dfcot.get_value(index = assigned,col = "Max # Pers"),k)
-#        res_in_review = dfres.loc[i]
-#        assigned = res_in_review.loc['Assigned']- 1#corrigeren voor 
-#        cot_in_review = dfcot.loc[assigned]
-#        if cot_in_review.loc["Class"]>res_in_review.loc['Class']: upgrades += 1
-#        eff_nr_pers = min(possible_cap[possible_cap > res_in_review.loc["# Persons"]])
-#        if eff_nr_pers > cot_in_review.loc["Max # Pers"]: upgrades += 1
+    #        print('Class',dfcot.get_value(index = assigned,col = "Class"),dfres.get_value(index = k,col = 'Class'),k)
+        else:
+            eff_nr_pers = min(possible_cap[possible_cap >= temp_res.get_value(index= k,col = "# Persons")])
+            if eff_nr_pers < dfcot.get_value(index = assigned,col = "Max # Pers"): 
+                upgrades += 1
+    return(6*gaps - 3*weekendgaps + 12*legionella + upgrades)
+#    print(upgrades,'upgrades')    
+#    print(gaps ,'gaps')
+#    print(weekendgaps,'weekendgaps')
+#    print(legionella,'legionella')
+#    print(6*gaps - 3*weekendgaps + 12*legionella + upgrades,'score',cot_id)
 
-print(upgrades,'upgrades')    
-print(gaps ,'gaps')
-print(weekendgaps,'weekendgaps')
-print(legionella,'legionella')
-print(6*gaps - 3*weekendgaps + 12*legionella + upgrades,'score')
 
 def writer():
     name = input("Naam:")
@@ -114,4 +127,32 @@ def writer():
     dfbez.to_excel(writer,'Bezetting')
     dfcot.to_excel(writer,'Cottages')
     writer.save()
-        
+    
+#swap(1292,10,1155,6)
+
+temp=dfres[dfres['Cottage (Fixed)']==0]
+temp=temp[temp['Arrival Date'] == pd.unique(temp['Arrival Date'])[0]]
+temp=temp[temp['Length of Stay']==4]
+s = 0
+for i in pd.unique(temp['Assigned']):
+    s+=score(i)
+print(s)    
+for i in tqdm(temp.index):
+    cot_id1=temp.get_value(index=i,col='Assigned')
+    for j in temp.index:
+        cot_id2=temp.get_value(index=j,col='Assigned')
+        if i!=j:
+            x=score(cot_id1)+score(cot_id2)
+            if is_val_swap(i+1,cot_id2) and is_val_swap(j+1,cot_id1):
+                swap(i+1,cot_id1,j+1,cot_id2)
+                y=score(cot_id1)+score(cot_id2)
+                if y<x:
+                    swap(i+1,cot_id1,j+1,cot_id2)
+#                else:
+#                    print('verwissel',i+1,j+1)
+                    
+#cot = 1
+#x=pd.unique(dfbez.loc[0])[0]
+#duration = dfres.get_value(index=x-1,col='Length of Stay')
+#col = dfbez.columns.get_loc(dfres.get_value(index=x-1,col='Arrival Date'))
+#dfbez.loc[cot-1][col:col+duration]=0

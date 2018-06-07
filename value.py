@@ -40,6 +40,7 @@ def is_val_swap(res_id, cot_id):#kijkt of een combinatie reservering/huis geldig
     if dfres.get_value(index=res_id - 1,col='Class') > dfcot.get_value(index=cot_id - 1,col='Class'):
         return(False) # Minimaal de juiste klasse?
     return(True) #Voldoet aan alle eisen         
+    
 def score(cot_id):        
     gaps = 0
     legionella = 0
@@ -47,7 +48,7 @@ def score(cot_id):
     upgrades = 0
     possible_cap = np.array([2, 4, 5, 6, 8, 12])#mogelijke huizen, uit de handleiding
     
-    temp= dfbez.loc[cot_id]
+    temp= dfbez.loc[cot_id-1]
     #temp= dfbez[208:209]
     line = '0'
     for j in temp.index:
@@ -91,27 +92,28 @@ def initialize():
     global dfbez
     global test
 #    file = 'startoplossing.xlsx
-    file = 'startoplossing.xlsx'
+    file = 'score 3619.xlsx'
     
     xl = pd.ExcelFile(file) 
     
     dfcot = xl.parse('Cottages')
     dfres = xl.parse("Reservations")
+    dfbez = xl.parse("Bezetting")
     dfres=dfres.sort_values(by='ID')
     startdate = datetime.datetime(2017,7,3)
     index = []
     for i in range(0,42): #Maak lijst van alle beschikbare data als kolom-index
         index.append(startdate + datetime.timedelta(days = i))
     
-    dfbez = pd.DataFrame(np.zeros((819,42), dtype=int),columns = index)
-    
-    for i in tqdm(dfres.index):
-        assign(dfres.get_value(index = i,col ='ID'),dfres.get_value(index=i,col='Assigned'))
+#    dfbez = pd.DataFrame(np.zeros((819,42), dtype=int),columns = index)
+#    
+#    for i in tqdm(dfres.index):
+#        assign(dfres.get_value(index = i,col ='ID'),dfres.get_value(index=i,col='Assigned'))
 #    score_array = []
 #    s=0
 #    for i in (dfcot.index):
 #        temp=score(i)
-#        score_array.append(temp)
+#        score_array.append(temp)df
 #    s+=temp
 #    print(s)
 #    dfcot=dfcot.assign(Score = score_array)    
@@ -120,9 +122,6 @@ def initialize():
 if not 'dfres' in globals():
     initialize()
     
-
-
-
 
 def writer():
     name = input("Naam:")
@@ -134,30 +133,47 @@ def writer():
     dfcot.to_excel(writer,'Cottages')
     writer.save()
     
-#swap(1292,10,1155,6)
 
 temp=dfres[dfres['Cottage (Fixed)']==0]
+notzero = pd.unique(dfcot[dfcot['Score']!=0].loc[:]['ID'])
+temp=temp[temp['ID'].isin(notzero)]
+s=0
+for i in dfcot.index:
+    s+=score(i+1)
+print(s)
 
-
-for start_res in range(0,500):
+for start_res in tqdm(temp.index):
     start_res+=1
     cot_id1=dfres.get_value(index=start_res-1,col='Assigned')
     current=dfbez.loc[cot_id1-1]
     t=current[current==start_res].index
     duration = dfres.get_value(index=start_res-1,col='Length of Stay')
-    startdate=t[0]
-    enddate=t[-1]
+#    startdate=t[0]
+#    enddate=t[-1]
 #    print(startdate,enddate)
+    improved=False
+
     for cot_id2 in dfcot.index:
-        cot_id2+=1#Vervang misschien door lookup zodra er gesorteerd wordt
-        if pd.isnull(dfbez.loc[cot_id2-1][t]).all():
-            s1=score(cot_id1)+score(cot_id2)
-            if is_val_swap(start_res+1,cot_id2+1):
-                swap(start_res+1,cot_id1,0,cot_id2)
-                s2=score(cot_id1)+score(cot_id2)
-                if s2>s1:
-                    swap(start_res+1,cot_id1,0,cot_id2)
-            print(start_res+1,cot_id2+1)
+        if not improved:#mogelijk verbeteren
+            cot_id2+=1#Vervang misschien door lookup zodra er gesorteerd wordt
+            if max((dfbez.loc[cot_id2-1][t]))==0:
+                s1=score(cot_id1)+score(cot_id2)
+                if is_val_swap(start_res,cot_id2):
+                    swap(start_res,cot_id1,0,cot_id2)
+                    s2=score(cot_id1)+score(cot_id2)
+                    if s2>s1:
+                        swap(start_res,cot_id2,0,cot_id1)
+#                        print('swapping back', start_res,cot_id2)
+                    else:
+                        improved = True
+                        dfres.set_value(start_res-1,'Assigned',cot_id2)
+#                        print('Assuming', start_res,cot_id2)
+
+s=0
+for i in dfcot.index:
+    s+=score(i+1)
+print(s)
+
 #for x in pd.unique(dfres['Arrival Date']):
 #    temp=temp[temp['Arrival Date'] == x]
 #    for y in  pd.unique(temp['Length of Stay']):

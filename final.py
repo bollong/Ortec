@@ -4,7 +4,8 @@ Created on Fri Jun  8 22:08:54 2018
 
 @author: Frank
 """
-
+import warnings
+warnings.simplefilter(action = 'ignore',category=FutureWarning)
 import pandas as pd
 import numpy as np
 import datetime
@@ -19,11 +20,10 @@ def initialize():
     global dfcot
     global dfres   
     global dfbez
-    file = "El Orteca Resorts - Data 20170703_20170813.xlsx"
+    file = "startoplossing.xlsx"
     
     xl = pd.ExcelFile(file)
 
-    # Load a sheet into a DataFrame by name: df1
     dfcot = xl.parse('Cottages')
     dfres = xl.parse("Reservations")
     dfres = dfres.assign(Assigned = np.zeros(len(dfres), dtype = int))
@@ -58,11 +58,11 @@ def is_val(res_id, cot_id):#kijkt of een combinatie reservering/huis geldig is
             return(False)
     return(True) #Voldoet aan alle eisen
             
-def assign(res_id, cot_id):
-    datum = dfres.loc[res_id-1]['Arrival Date']
+def assign(res_id, cot_id):#Ken een reservering toe aan een huis
+    datum = dfres.get_value(index = res_id-1,col = 'Arrival Date')
     col = dfbez.columns.get_loc(datum)
-    duration = dfres.loc[res_id-1]['Length of Stay']
-    dfbez.loc[cot_id -1][col:col+duration] += 1
+    duration = dfres.get_value(index = res_id-1,col ='Length of Stay')
+    dfbez.loc[cot_id -1][col:col+duration] += res_id
     dfres.loc[res_id - 1,'Assigned']=cot_id
 
 def fixed_assign():        
@@ -75,15 +75,8 @@ def fixed_assign():
 
 
 
-def class_assign(todo,dfcot_class,dfbez):
-#    from tqdm import tqdm
-#    todo = pair[0]
-#    dfcot_class=pair[1]
+def class_assign(todo,dfcot_class,dfbez):#kent reserveringen toe binnen een klasse
     todo = todo.loc[todo['Assigned'] == 0]
-#    todo = todo.sort_values(by=['Wi-Fi Coverage '],ascending =False)
-    
-    
-#    todo = todo.sort_values(by=['Dish Washer '],ascending =False) 
     todo = todo.sort_values(by=['Length of Stay'],ascending =False)   
     todo = todo.sort_values(by=['# Persons'],ascending =False)
     
@@ -91,8 +84,7 @@ def class_assign(todo,dfcot_class,dfbez):
                       
     dfcot_class = dfcot_class.sort_values(by=['NrUpgrade'],ascending=True)
     dfcot_class=dfcot_class.sort_values(by=['Max # Pers'],ascending= True)
-#    todo=todo[0:10]
-    for j in tqdm(todo.index):
+    for j in (todo.index):
         k=0
         match = False
         res_id = todo.loc[j,"ID"] 
@@ -100,7 +92,6 @@ def class_assign(todo,dfcot_class,dfbez):
             if is_val(res_id, dfcot_class.iloc[k]["ID"]):
                 assign(res_id,dfcot_class.iloc[k]["ID"])
                 match = True
-#                print("Assigning ",res_id,"to ",dfcot_class.iloc[k]["ID"])
             else:
                 k+=1
     klasse = dfcot_class.iloc[1]['Class']           
@@ -231,8 +222,8 @@ if __name__ == '__main__':#Om recursie in het multiprocessing te voorkomen
     done = done.loc[done['Cottage (Fixed)'] == 0]
     for i in tqdm(done.index):
         assign(done.loc[i,'ID'],done.loc[i,'Assigned'])
-        
-    print(len(dfres.loc[dfres["Assigned"]==0]), 'Personen nog niet ingedeeld')
+    
+    final_assign()
     writer('Startoplossing')
     
 for cot_id in dfcot.index:
@@ -240,12 +231,13 @@ for cot_id in dfcot.index:
 startscore=0
 for i in dfcot.index:
     startscore+=score(i+1)
-print('Begin score',str(startscore))
+print('Begin score'+str(startscore))
 s=0
 while startscore != s:#deze zijn gelijk als er geen verandering plaats meer vindt
     startscore = s
     temp=dfres[dfres['Cottage (Fixed)']==0]
     notzero = pd.unique(dfcot[dfcot['Score']!=0].loc[:]['ID'])
+    dfcot.sort_values(by='Score',ascending=False)
 #    temp=temp[temp['ID'].isin(notzero)]
 #    dfcot.sort_values(by='Score',ascending=False)
     for start_res in tqdm(temp.index):

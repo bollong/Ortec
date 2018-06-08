@@ -116,26 +116,27 @@ def check():
         for y in range(0,len(test1)):
             if test1['# Persons'].iloc[y] > test2['Max # Pers'].iloc[0]:
 #                return(False)
-                print('res',test1['ID'].iloc[y], 'past niet in', test2['ID'].iloc[0], 'door personen')
+                print('res',test1['ID'].iloc[y], 'past niet in huisje', test2['ID'].iloc[0], 'door personen')
 #                upgrade = 1
                 
             if test1['Class'].iloc[y] > test2['Class'].iloc[0]:
 #                return(False)
-                print('res',test1['ID'].iloc[y], 'past niet in', test2['ID'].iloc[0], 'door klasse')
+                print('res',test1['ID'].iloc[y], 'past niet in huisje', test2['ID'].iloc[0], 'door klasse')
             elif test1['Class'].iloc[y] < test2['Class'].iloc[0]:
                 upgrade = 1
                 
             for opt in options2:
                 if (test1[opt].iloc[y] == 1) and (test2[opt].iloc[0] == 0):
-                    print('res',test1['ID'].iloc[y], 'past niet in', test2['ID'].iloc[0], 'door opties')
+                    print('res',test1['ID'].iloc[y], 'past niet in huisje', test2['ID'].iloc[0], 'door opties')
 #                elif (test1[opt].iloc[y] == 0) and (test2[opt].iloc[0] == 1):
 #                    upgrade = 1
             
-            datum = test1['Arrival Date']
+            datum = test1['Arrival Date'].iloc[y]
             col = dfbez.columns.get_loc(datum)
-            for j in range(1,test1['Length of Stay'].iloc[y]):
-                if dfbez.loc[dfres['Assigned'] == i][col + j] == 1:
-                    print('false voor id nummer', test1['ID'].iloc[y], 'voor huisje', test2['ID'].iloc[0])    
+            row = test1['Assigned'].iloc[y]-1
+            for j in range(0,test1['Length of Stay'].iloc[y]):
+                if dfbez.loc[row][col + j] != 1:
+                    print('res', test1['ID'].iloc[y], 'past niet in huisje', test2['ID'].iloc[0])   
             
             
  
